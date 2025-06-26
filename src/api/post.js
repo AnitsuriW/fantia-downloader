@@ -10,21 +10,27 @@ export default class Post {
   }
 
   async getInformation() {
-    console.log("Fetching information for", this.id);
-    if (!this.data)
-      await Axios.request({
-        method: "GET",
-        url: `https://fantia.jp/api/v1/posts/${this.id}`,
-        headers: {
-          Cookie: `_session_id=${process.env.SESSION_ID}`,
-        },
-      }).then(response => {
-        this.data = response.data.post;
-        this.title = this.data.title;
-      });
+  console.log("Fetching information for", this.id);
+  if (!this.data)
+    await Axios.request({
+      method: "GET",
+      url: `https://fantia.jp/api/v1/posts/${this.id}`,
+      headers: {
+        Cookie: `_session_id=${process.env.SESSION_ID}`,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+        "Referer": `https://fantia.jp/posts/${this.id}`,
+        "Origin": "https://fantia.jp"
+      },
+    }).then(response => {
+      this.data = response.data.post;
+      this.title = this.data.title;
+    });
 
     return Promise.resolve(this.data);
   }
+
 
   async getContents() {
     let postInfo = await this.getInformation();
