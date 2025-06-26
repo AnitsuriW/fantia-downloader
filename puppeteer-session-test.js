@@ -1,4 +1,3 @@
-// fantia-auto-downloader.js
 import puppeteer from "puppeteer";
 import axios from "axios";
 import fs from "fs-extra";
@@ -14,6 +13,7 @@ const BASE_DIR = process.env.DOWNLOAD_PATH || "Fantia_Downloads";
 const COOKIE_FILE = "cookie.json";
 const DIRECTION = process.env.DIRECTION || "once";
 const BLOCK_KEYWORDS = (process.env.BLOCK_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
+const BLOCK_FILENAME_KEYWORDS = (process.env.BLOCK_FILENAME_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -23,7 +23,6 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
   const page = await browser.newPage();
   let cookies = null;
 
-  // Load cookie if exists
   if (await fs.pathExists(COOKIE_FILE)) {
     cookies = await fs.readJSON(COOKIE_FILE);
     await page.setCookie(...cookies);
@@ -103,6 +102,11 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
       });
 
       for (const res of resources) {
+        if (BLOCK_FILENAME_KEYWORDS.some(k => res.filename.includes(k))) {
+          console.log(`🚫 跳过文件（匹配屏蔽关键词）: ${res.filename}`);
+          continue;
+        }
+
         const filePath = path.join(saveDir, res.filename);
         if (await fs.pathExists(filePath)) {
           console.log(`⏩ 跳过已存在文件: ${res.filename}`);
