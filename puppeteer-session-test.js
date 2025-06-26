@@ -6,10 +6,14 @@ import path from "path";
 import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import readline from "readline";
+import dotenv from "dotenv";
+process.on("exit", () => process.exit(0));
+dotenv.config();
 
-const BASE_DIR = "Fantia_Downloads";
+const BASE_DIR = process.env.DOWNLOAD_PATH || "Fantia_Downloads";
 const COOKIE_FILE = "cookie.json";
-const DIRECTION = "forward"; // 可设置为 "forward", "backward", 或 "once"
+const DIRECTION = process.env.DIRECTION || "once";
+const BLOCK_KEYWORDS = (process.env.BLOCK_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -68,89 +72,95 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
       break;
     }
 
-    const titleSafe = postData.post.title.replace(/[\\/:*?"<>|]/g, "_");
-    const saveDir = path.join(BASE_DIR, `${POST_ID}_${titleSafe}`);
-    await fs.ensureDir(saveDir);
-    await fs.writeJSON(path.join(saveDir, "post.json"), postData, { spaces: 2 });
+    const title = postData.post.title || "";
+    const titleSafe = title.replace(/[\\/:*?"<>|]/g, "_");
 
-    const sessionCookies = await page.cookies();
-    const sessionHeader = sessionCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    if (BLOCK_KEYWORDS.some(keyword => title.includes(keyword))) {
+      console.log(`🚫 跳过标题包含屏蔽关键词的 post: ${title}`);
+    } else {
+      const saveDir = path.join(BASE_DIR, `${POST_ID}_${titleSafe}`);
+      await fs.ensureDir(saveDir);
+      await fs.writeJSON(path.join(saveDir, "post.json"), postData, { spaces: 2 });
 
-    const contents = postData.post.post_contents || [];
-    const resources = contents.flatMap((content) => {
-      const videos = content.download_uri
-        ? [
-            {
-              url: `https://fantia.jp${content.download_uri}`,
-              filename: content.filename || `video-${content.id}.mp4`,
+      const sessionCookies = await page.cookies();
+      const sessionHeader = sessionCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+
+      const contents = postData.post.post_contents || [];
+      const resources = contents.flatMap((content) => {
+        const videos = content.download_uri
+          ? [
+              {
+                url: `https://fantia.jp${content.download_uri}`,
+                filename: content.filename || `video-${content.id}.mp4`,
+              },
+            ]
+          : [];
+        const images = (content.post_content_photos || []).map((photo) => ({
+          url: photo.url.original,
+          filename: `image-${photo.id}.jpg`,
+        }));
+        return [...videos, ...images];
+      });
+
+      for (const res of resources) {
+        const filePath = path.join(saveDir, res.filename);
+        if (await fs.pathExists(filePath)) {
+          console.log(`⏩ 跳过已存在文件: ${res.filename}`);
+          continue;
+        }
+
+        try {
+          const { headers } = await axios.head(res.url, {
+            headers: {
+              Cookie: sessionHeader,
+              Referer: `https://fantia.jp/posts/${POST_ID}`,
+              "User-Agent": "Mozilla/5.0",
             },
-          ]
-        : [];
-      const images = (content.post_content_photos || []).map((photo) => ({
-        url: photo.url.original,
-        filename: `image-${photo.id}.jpg`,
-      }));
-      return [...videos, ...images];
-    });
+          });
 
-    for (const res of resources) {
-      const filePath = path.join(saveDir, res.filename);
-      if (await fs.pathExists(filePath)) {
-        console.log(`⏩ 跳过已存在文件: ${res.filename}`);
-        continue;
-      }
+          const totalSize = parseInt(headers["content-length"], 10);
+          const bar = new cliProgress.SingleBar({
+            format: `${res.filename} [{bar}] {percentage}% {value}/{total}`,
+            barCompleteChar: "█",
+            barIncompleteChar: "-",
+            hideCursor: true,
+          }, cliProgress.Presets.shades_classic);
 
-      try {
-        const { headers } = await axios.head(res.url, {
-          headers: {
-            Cookie: sessionHeader,
-            Referer: `https://fantia.jp/posts/${POST_ID}`,
-            "User-Agent": "Mozilla/5.0",
-          },
-        });
-
-        const totalSize = parseInt(headers["content-length"], 10);
-        const bar = new cliProgress.SingleBar({
-          format: `${res.filename} [{bar}] {percentage}% {value}/{total}`,
-          barCompleteChar: "█",
-          barIncompleteChar: "-",
-          hideCursor: true,
-        }, cliProgress.Presets.shades_classic);
-
-        bar.start(totalSize, 0, {
-          value: "0",
-          total: prettyBytes(totalSize),
-        });
-
-        const response = await axios.get(res.url, {
-          responseType: "stream",
-          headers: {
-            Cookie: sessionHeader,
-            Referer: `https://fantia.jp/posts/${POST_ID}`,
-            "User-Agent": "Mozilla/5.0",
-          },
-        });
-
-        let downloaded = 0;
-        response.data.on("data", (chunk) => {
-          downloaded += chunk.length;
-          bar.update(downloaded, {
-            value: prettyBytes(downloaded),
+          bar.start(totalSize, 0, {
+            value: "0",
             total: prettyBytes(totalSize),
           });
-        });
 
-        await new Promise((res, rej) => {
-          const writer = fs.createWriteStream(filePath);
-          response.data.pipe(writer);
-          writer.on("finish", res);
-          writer.on("error", rej);
-        });
+          const response = await axios.get(res.url, {
+            responseType: "stream",
+            headers: {
+              Cookie: sessionHeader,
+              Referer: `https://fantia.jp/posts/${POST_ID}`,
+              "User-Agent": "Mozilla/5.0",
+            },
+          });
 
-        bar.stop();
-        console.log(`✅ 下载完成: ${res.filename}`);
-      } catch (e) {
-        console.warn(`❌ 下载失败: ${res.filename} - ${e.message}`);
+          let downloaded = 0;
+          response.data.on("data", (chunk) => {
+            downloaded += chunk.length;
+            bar.update(downloaded, {
+              value: prettyBytes(downloaded),
+              total: prettyBytes(totalSize),
+            });
+          });
+
+          await new Promise((res, rej) => {
+            const writer = fs.createWriteStream(filePath);
+            response.data.pipe(writer);
+            writer.on("finish", res);
+            writer.on("error", rej);
+          });
+
+          bar.stop();
+          console.log(`✅ 下载完成: ${res.filename}`);
+        } catch (e) {
+          console.warn(`❌ 下载失败: ${res.filename} - ${e.message}`);
+        }
       }
     }
 
@@ -178,4 +188,5 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 
   console.log("🎉 所有可下载内容处理完成。");
   await browser.close();
+  process.exit(0);
 })();
