@@ -1,48 +1,65 @@
+[English](README.md) | [中文](README.zh.md)
+
 # What is Fantia downloader?
-[Fantia](https://fantia.jp), which is a platform to share photos and arts.  
-This downloader is for those who wants to download all medias (both image and video) that created by specific creator.
+
+[Fantia](https://fantia.jp) is a platform for creators to share exclusive content such as photos and videos.  
+This downloader allows you to download all media (images and videos) from posts, starting from a specified post ID and navigating forward or backward automatically.
 
 # Requirements
 - [Node.js Environment](https://nodejs.org)
-- [Yarn Package Manager](https://classic.yarnpkg.com/en/docs/install/)
+- [Yarn Package Manager](https://classic.yarnpkg.com/en/docs/install/) (or use `npm` instead)
 
 # Getting Started
-To start download, following is steps:
-1. Copy `.env.example` to `.env` and configure it well.
-2. Run `yarn install` to install required packages.
-3. Run `node .` to start program.
-4. CLI will ask for first post id to start, enter first post id to start download automatically!
+1. Copy `.env.example` to `.env` and configure the required variables.
+2. Run `yarn install` (or `npm install`) to install required packages.
+3. Run `node .` to start the program.
+4. The CLI will ask for the starting post ID — enter a valid Fantia post ID to begin downloading.
 
-Note: Post ID can found in URL, for example, if URL is `https://fantia.jp/posts/123456`, then it should be `123456`.  
-Note 2: There will have a cooldown between two post for avoid too many requests.
+Post ID can be found in the URL:  
+Example: `https://fantia.jp/posts/123456` → ID = `123456`
 
-If you found that always display 0 asset to download, please make sure SESSION_ID is up-to-date (brand new).
+The script includes a cooldown between posts to prevent request throttling.
 
 # Environment Variables
+
 ## DOWNLOAD_PATH
-Where downloaded files to save, both relative and absolute are acceptable.
+Where downloaded files will be saved. You can use either absolute or relative paths.  
 
 ## SESSION_ID
-This value is used for access member only resources.
+Used for legacy direct API access.  
+Not required when using Puppeteer to log in interactively.
 
-To get this value, please follow these steps:
-1. Login to [Fantia](https://fantia.jp) with your browser.
-2. Open `DevTools` in your browser, which usually can open by press F12.
-3. Switch to `Network` tab in DevTools, you will see network requests.
-4. Choose any request which is sent by POST method.
-5. Switch to `Cookies` tab, which is a sub tab of `Network` tab.
-6. You will find a cookie named `_session_id`, copy that value and paste here.
+## BLOCK_KEYWORDS
+Filter out posts whose titles contain any of these keywords.  
+Multiple keywords should be separated by commas.  
+Example:  
+`BLOCK_KEYWORDS=test,draft,noaudio`
+
+## BLOCK_FILENAME_KEYWORDS
+Skip specific media files whose filenames contain any of these keywords.  
+Multiple keywords should be separated by commas.  
+Example:  
+`BLOCK_FILENAME_KEYWORDS=English,twitter`
 
 ## DIRECTION
-Avaliable options: `forward`, `backward`.
+Specifies the direction in which to crawl posts:
+- `forward` – Go to the next post (newer)
+- `backward` – Go to the previous post (older)
+- `once` – Download only the specified post and stop
 
-Forward, means it will go to **next** post after current post downloaded (To newer post).  
-Backward, means it will go to **previous** post after current post downloaded (To older post).
+# Features
+- Automated post navigation (`forward`, `backward`, or `once`)
+- Progress bar with file size display
+- Saves `post.json` for each downloaded post
+- Skips files that already exist
+- Keyword-based filtering for both post titles and individual filenames
+- Supports login through interactive Puppeteer Chrome session (no need for manual cookie copy)
+- Automatically continues to next/previous post after download
 
-# Known Issues
+# Forbidden characters in filenames (on Windows)
+The following characters are not allowed in filenames on Windows and are automatically replaced with `+`:
 
-## Forbidden characters in name on windows (resolved, with side effect)
+`/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`
 
-On windows, there are some characters are forbidden in a file or directory name, so I replaced them into `+` character.
-
-Following characters will be replaced into `+` character: `/`, `\`, `?`, `%`, `*`, `:`, `|`, `"`, `<`, `>`.
+# License
+MIT
