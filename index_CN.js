@@ -6,12 +6,16 @@ import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import readline from "readline";
 import dotenv from "dotenv";
+import { execSync } from "child_process";
+
 process.on("exit", () => process.exit(0));
 dotenv.config();
 
 const BASE_DIR = process.env.DOWNLOAD_PATH || "Fantia_Downloads";
 const COOKIE_FILE = "cookie.json";
 const DIRECTION = process.env.DIRECTION || "once";
+const USE_IDM = process.env.USE_IDM === "true";
+const IDM_PATH = process.env.IDM_PATH || 'C:\\Program Files (x86)\\Internet Download Manager\\IDMan.exe';
 const BLOCK_KEYWORDS = (process.env.BLOCK_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 const BLOCK_FILENAME_KEYWORDS = (process.env.BLOCK_FILENAME_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 
@@ -26,7 +30,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
   if (await fs.pathExists(COOKIE_FILE)) {
     cookies = await fs.readJSON(COOKIE_FILE);
     await page.setCookie(...cookies);
-    console.log("🍪 已加载 cookie.json，尝试免登录");
+    console.log("✅ 已加载 cookie.json，尝试免登录");
   }
 
   await page.goto("https://fantia.jp/", { waitUntil: "networkidle2" });
@@ -35,11 +39,11 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
     await new Promise((r) => process.stdin.once("data", r));
     const newCookies = await page.cookies();
     await fs.writeJSON(COOKIE_FILE, newCookies, { spaces: 2 });
-    console.log("✅ 已保存 cookie.json，可供下次免登录使用");
+    console.log("✅ 登录成功，已保存 cookie.json");
   }
 
   const ask = (q) => new Promise((res) => rl.question(q, res));
-  const input = await ask("请输入起始 Post ID：");
+  const input = await ask("📥 请输入起始 Post ID：");
   rl.close();
   let currentPostURL = `https://fantia.jp/posts/${input.trim()}`;
   let visited = new Set();
@@ -50,7 +54,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
     if (!POST_ID || visited.has(POST_ID)) break;
     visited.add(POST_ID);
 
-    console.log("\n📥 正在处理 post:", POST_ID);
+    console.log(`\n📂 处理 Post: ${POST_ID}`);
 
     let postData = null;
     page.removeAllListeners("response");
@@ -67,13 +71,13 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
     await page.goto(`https://fantia.jp/posts/${POST_ID}`, { waitUntil: "networkidle2" });
     await delay(3000);
     if (!postData) {
-      console.warn("⚠️ 跳过无法解析的 post:", POST_ID);
+      console.warn("⚠️ 跳过无法解析的 Post:", POST_ID);
     } else {
       const title = postData.post.title || "";
       const titleSafe = title.replace(/[\\/:*?"<>|]/g, "_");
 
       if (BLOCK_KEYWORDS.some(keyword => title.includes(keyword))) {
-        console.log(`🚫 跳过标题包含屏蔽关键词的 post: ${title}`);
+        console.log(`🚫 跳过标题包含关键词的 Post: ${title}`);
       } else {
         const saveDir = path.join(BASE_DIR, `${POST_ID}_${titleSafe}`);
         await fs.ensureDir(saveDir);
@@ -85,12 +89,10 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
         const contents = postData.post.post_contents || [];
         const resources = contents.flatMap((content) => {
           const videos = content.download_uri
-            ? [
-                {
-                  url: `https://fantia.jp${content.download_uri}`,
-                  filename: content.filename || `video-${content.id}.mp4`,
-                },
-              ]
+            ? [{
+                url: `https://fantia.jp${content.download_uri}`,
+                filename: content.filename || `video-${content.id}.mp4`,
+              }]
             : [];
           const images = (content.post_content_photos || []).map((photo) => ({
             url: photo.url.original,
@@ -101,13 +103,26 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 
         for (const res of resources) {
           if (BLOCK_FILENAME_KEYWORDS.some(k => res.filename.includes(k))) {
-            console.log(`🚫 跳过文件（匹配屏蔽关键词）: ${res.filename}`);
+            console.log(`🚫 跳过文件（匹配关键词）: ${res.filename}`);
             continue;
           }
 
           const filePath = path.join(saveDir, res.filename);
           if (await fs.pathExists(filePath)) {
             console.log(`⏩ 跳过已存在文件: ${res.filename}`);
+            continue;
+          }
+
+          if (USE_IDM) {
+            try {
+              const cmdAdd = `"${IDM_PATH}" /d "${res.url}" /p "${saveDir}" /f "${res.filename}" /n /a`;
+              const cmdStart = `"${IDM_PATH}" /s`;
+              execSync(cmdAdd);
+              execSync(cmdStart);
+              console.log(`📥 已添加到 IDM 并开始下载: ${res.filename}`);
+            } catch (e) {
+              console.warn(`❌ IDM 下载失败: ${res.filename} - ${e.message}`);
+            }
             continue;
           }
 
@@ -181,7 +196,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
     }, DIRECTION);
 
     if (!nextLink) {
-      console.log("✅ 没有更多可跳转的 post，任务完成。");
+      console.log("✅ 没有更多可跳转的 Post，任务完成。");
       break;
     }
 

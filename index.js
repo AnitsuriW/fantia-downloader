@@ -6,12 +6,16 @@ import cliProgress from "cli-progress";
 import prettyBytes from "pretty-bytes";
 import readline from "readline";
 import dotenv from "dotenv";
+import { execSync } from "child_process";
+
 process.on("exit", () => process.exit(0));
 dotenv.config();
 
 const BASE_DIR = process.env.DOWNLOAD_PATH || "Fantia_Downloads";
 const COOKIE_FILE = "cookie.json";
 const DIRECTION = process.env.DIRECTION || "once";
+const USE_IDM = process.env.USE_IDM === "true";
+const IDM_PATH = process.env.IDM_PATH || '"C:\\Program Files (x86)\\Internet Download Manager\\IDMan.exe"';
 const BLOCK_KEYWORDS = (process.env.BLOCK_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 const BLOCK_FILENAME_KEYWORDS = (process.env.BLOCK_FILENAME_KEYWORDS || "").split(",").map(k => k.trim()).filter(Boolean);
 
@@ -50,7 +54,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
     if (!POST_ID || visited.has(POST_ID)) break;
     visited.add(POST_ID);
 
-    console.log("\nProcessing post:", POST_ID);
+    console.log(`\nProcessing post: ${POST_ID}`);
 
     let postData = null;
     page.removeAllListeners("response");
@@ -106,6 +110,18 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
           const filePath = path.join(saveDir, res.filename);
           if (await fs.pathExists(filePath)) {
             console.log(`Skipping existing file: ${res.filename}`);
+            continue;
+          }
+
+          if (USE_IDM) {
+            try {
+              const command = `"${IDM_PATH}" /d "${res.url}" /p "${saveDir}" /f "${res.filename}" /n /a`;
+              execSync(command);
+              execSync(`"${IDM_PATH}" /s`);
+              console.log(`Added to IDM queue: ${res.filename}`);
+            } catch (e) {
+              console.warn(`Failed to add to IDM: ${res.filename} - ${e.message}`);
+            }
             continue;
           }
 
