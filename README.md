@@ -5,9 +5,12 @@
 [Fantia](https://fantia.jp) is a platform for creators to share exclusive content such as photos and videos.  
 This downloader allows you to download all media (images and videos) from posts, starting from a specified post ID and navigating forward or backward automatically.
 
+> ⚠️ This tool is designed to be used only with the official Fantia web interface (GUI browser). It relies on Puppeteer to simulate browser behavior and should not be used with headless API-only access.
+
 # Requirements
 - [Node.js Environment](https://nodejs.org)
 - [Yarn Package Manager](https://classic.yarnpkg.com/en/docs/install/) (or use `npm` instead)
+- (optional) [Internet Download Manager (IDM)](https://www.internetdownloadmanager.com/) if using IDM for downloading
 
 # Getting Started
 1. Copy `.env.example` to `.env` and configure the required variables.
@@ -47,7 +50,17 @@ Specifies the direction in which to crawl posts:
 - `backward` – Go to the previous post (older)
 - `once` – Download only the specified post and stop
 
+## USE_IDM
+
+If `true`, the downloader will call Internet Download Manager to handle downloads.  
+IDM must be installed and `IDM_PATH` set correctly.  
+
+## IDM_PATH
+
+Full path to `IDMan.exe`.  
+
 # Features
+
 - Automated post navigation (`forward`, `backward`, or `once`)
 - Progress bar with file size display
 - Saves `post.json` for each downloaded post

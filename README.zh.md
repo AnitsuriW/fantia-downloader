@@ -5,10 +5,12 @@
 [Fantia](https://fantia.jp) 是一个创作者分享付费内容的平台（如图片和视频）。  
 本下载器可帮助你从指定的 Post ID 开始，自动下载该 Post 中的全部媒体资源，并根据设定自动前进或后退跳转至其他 Post。
 
+> ⚠️ 本项目设计用于 GUI 图形界面模式（需浏览器登录），依赖 Puppeteer 模拟用户行为。**不支持纯 API 接口方式运行**。
+
 # 环境要求
 
-- 安装 [Node.js 环境](https://nodejs.org)
-- 安装 [Yarn 包管理器](https://classic.yarnpkg.com/en/docs/install/)（也可以用 `npm` 替代）
+- 安装 [Node.js](https://nodejs.org) 环境
+- 安装 [Yarn](https://classic.yarnpkg.com/en/docs/install/) 包管理器（也可以用 `npm` 替代）
 
 # 使用方法
 
@@ -50,6 +52,15 @@
 - `forward` – 下载完成后跳转下一篇（较新）
 - `backward` – 下载完成后跳转上一篇（较旧）
 - `once` – 仅下载当前指定 Post，完成后退出
+
+## USE_IDM
+
+是否使用 IDM（Internet Download Manager）下载器。  
+设置为 `true` 将调用 IDM 执行下载。  
+
+## IDM_PATH
+
+IDM 的完整路径（指向 `IDMan.exe`）。  
 
 # 脚本功能
 
